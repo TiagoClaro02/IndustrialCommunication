@@ -8,7 +8,7 @@
 
 int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, uint8_t *APDU_R){
 
-    int sock, MBAPDU_R_len, APDU_R_len;
+    int sock, MBAPDU_R_len, APDU_R_len, len;
     struct sockaddr_in serv;
     socklen_t addlen = sizeof(serv);
     int MBAPDU_len = 7;
@@ -71,6 +71,8 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
         return -1;
     }
 
+    printf("[INFO] MBAPDU received\n");
+
     if(MBAPDU_R_len != MBAPDU_len){
         printf("[ERROR] Wrong MBAPDU length\n");
         return -1;
@@ -83,16 +85,21 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
         printf("[ERROR] Wrong PI\n");
         return -1;
     }
-    
 
+    APDU_R_len = MBAPDU_R[4] * 256 + MBAPDU_R[5];
 
+    if(len = recv(sock, APDU_R, APDU_R_len, 0) < 0){
+        perror("recv");
+        return -1;
+    }
 
+    printf("[INFO] APDU received\n");
 
     printf("[INFO] Closing socket...\n");
     close(sock);
     printf("[INFO] Socket closed\n");
 
-    return len;
+    return 0;
 }
 
 
