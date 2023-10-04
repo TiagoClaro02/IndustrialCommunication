@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/types.h>
@@ -9,12 +8,15 @@
 
 int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, uint8_t *APDU_R){
 
-    int sock, len;
+    int sock, MBAPDU_R_len, APDU_R_len;
     struct sockaddr_in serv;
     socklen_t addlen = sizeof(serv);
-    int MBAPDU_len = APDUlen + 15;
-    unit8_t MBAPDU[MBAPDU_len];
+    int MBAPDU_len = 7;
+    int PDU_len = MBAPDU_len + APDUlen;
+    uint8_t MBAPDU[MBAPDU_len];
+    uint8_t MBAPDU_R[MBAPDU_len];
     
+    printf("[INFO] Creating socket...\n");
     sock = socket(PF_INET, SOCK_STREAM, 0);
 
     if(sock < 0){
@@ -27,6 +29,7 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
     serv.sin_port = htons(port);
     inet_aton(server_add, &serv.sin_addr);
 
+    printf("[INFO] Connecting to %s:%d...\n", server_add, port)
     if(connect(sock, (struct sockaddr *)&serv, addlen) < 0){
         perror("connect");
         return -1;
@@ -35,51 +38,59 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
     printf("[INFO] Connected to %s:%d\n", server_add, port);
 
     // TI
-    MBAPDU[0] = 0;
-    MBAPDU[1] = 1;
+    MBAPDU[0] = 0x15;
+    MBAPDU[1] = 0x01;
     // PI
-    MBAPDU[2] = 0;
-    MBAPDU[3] = 0;
+    MBAPDU[2] = 0x00;
+    MBAPDU[3] = 0x00;
     // length
-    MBAPDU[4] = 0;
-    MBAPDU[5] = 8 + 1; // unit_ID + APDU
+    MBAPDU[4] = 0x00;
+    MBAPDU[5] = 0x06;
     // unit ID
-    MBAPDU[6] = 1;
+    MBAPDU[6] = 0xff;
 
-    // APDU
-    // FC
-    MBAPDU[7] = 16;
-    // Start
-    MBAPDU[8] = 0;
-    MBAPDU[9] = 1;
-    // num reg
-    MBAPDU[10] = 0;
-    MBAPDU[11] = 1;
-    // num bytes
-    MBAPDU[12] = 2;
-    // reg val
-    MBAPDU[13] = 33;
-    MBAPDU[14] = 55;
-
-    for(int i=15; i<MBAPDU_len; i++){
-        MBAPDU[i] = APDU[i-15];
+    for(int i=0; i<MBAPDU_len; i++){
+        PDU[i] = MBAPDU[i];
+    }
+    for(int i=MBAPDU_len; i<PDU_len; i++){
+        PDU[i] = APDU[i-MBAPDU_len];
     }
 
-    if(len = send(sock, MBAPDU, MBAPDU_len, 0) < 0){
+    printf("[INFO] Sending data...\n");
+    if(len = send(sock, PDU, PDU_len, 0) < 0){
         perror("send");
         return -1;
     }
 
     printf("[INFO] Data sent\n");
 
-    if(len = recv(sock, MBAPDU, MBAPDU_len, 0) < 0){
+    printf("[INFO] Receiving data...\n");
+
+    if(MBAPDU_R_len = recv(sock, MBAPDU_R, MBAPDU_len, 0) < 0){
         perror("recv");
         return -1;
     }
 
-    printf("[INFO] Data received\n");
+    if(MBAPDU_R_len != MBAPDU_len){
+        printf("[ERROR] Wrong MBAPDU length\n");
+        return -1;
+    }
+    if(MBAPDU_R[0] != 0x15 || MBAPDU_R[1] != 0x01){
+        printf("[ERROR] Wrong TI\n");
+        return -1;
+    }
+    if(MBAPDU_R[2] != 0x00 || MBAPDU_R[3] != 0x00){
+        printf("[ERROR] Wrong PI\n");
+        return -1;
+    }
+    
 
+
+
+
+    printf("[INFO] Closing socket...\n");
     close(sock);
+    printf("[INFO] Socket closed\n");
 
     return len;
 }
