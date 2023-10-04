@@ -6,15 +6,18 @@
 #include <unistd.h>
 #include "modbusTCP.h"
 
+#define MBAPDU_len 7
+
 int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, uint8_t *APDU_R){
 
     int sock, MBAPDU_R_len, APDU_R_len, len;
     struct sockaddr_in serv;
     socklen_t addlen = sizeof(serv);
-    int MBAPDU_len = 7;
     int PDU_len = MBAPDU_len + APDUlen;
-    uint8_t MBAPDU[MBAPDU_len];
-    uint8_t MBAPDU_R[MBAPDU_len];
+    int TI=0;
+    unsigned char MBAPDU[MBAPDU_len];
+    unsigned char MBAPDU_R[MBAPDU_len];
+    unsigned char PDU[PDU_len];
     
     printf("[INFO] Creating socket...\n");
     sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -38,16 +41,16 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
     printf("[INFO] Connected to %s:%d\n", server_add, port);
 
     // TI
-    MBAPDU[0] = 0x15;
-    MBAPDU[1] = 0x01;
+    MBAPDU[0] = (uint8_t) (TI>>8);
+    MBAPDU[1] = (uint8_t) (TI & 0xff);
     // PI
     MBAPDU[2] = 0x00;
     MBAPDU[3] = 0x00;
     // length
-    MBAPDU[4] = 0x00;
-    MBAPDU[5] = 0x06;
+    MBAPDU[4] = (uint8_t) ((APDUlen+1)>>8);
+    MBAPDU[5] = (uint8_t) ((APDUlen+1) & 0xff);
     // unit ID
-    MBAPDU[6] = 0xff;
+    MBAPDU[6] = 0x01;
 
     for(int i=0; i<MBAPDU_len; i++){
         PDU[i] = MBAPDU[i];

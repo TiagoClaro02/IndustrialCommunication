@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "modbusAP.h"
 
 #define IP "127.0.0.1"
 #define PORT 502
