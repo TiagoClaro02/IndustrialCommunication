@@ -39,12 +39,12 @@ Example:
 #define FUNCTION_CODE READ
 #define STARTING_REGISTER 0
 #define NUMBER_OF_REGISTERS 10
-´´´
+```
 
 ```c
 // Data to write
 uint16_t DATA[NUMBER_OF_REGISTERS] = {153,69,153,148,159,14,0,86,157,142};
-´´´
+```
 
 Then, the client can be compiled and executed with the following commands:
 
