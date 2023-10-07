@@ -48,8 +48,7 @@ uint16_t DATA[NUMBER_OF_REGISTERS] = {153,69,153,148,159,14,0,86,157,142};
 
 Then, the client can be compiled and executed with the following commands:
 
-```bash
-gcc MBclient.c modbusAP.c modbusTCP.c -o MBclient
-
-./MBclient
+```console
+root@LAPTOP:~$ gcc MBclient.c modbusAP.c modbusTCP.c -o MBclient
+root@LAPTOP:~$ ./MBclient
 ```
