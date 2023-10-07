@@ -5,20 +5,40 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <stdint.h>
 
-#define MBAPDU_len 7
+#define MBAP_len 7
 
 int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, uint8_t *APDU_R){
 
-    int sock, MBAPDU_R_len, APDU_R_len, len;
+    int sock, len;
     struct sockaddr_in serv;
-    socklen_t addlen = sizeof(serv);
-    int PDU_len = MBAPDU_len + APDUlen;
-    int TI=0;
-    unsigned char MBAPDU[MBAPDU_len];
-    unsigned char MBAPDU_R[MBAPDU_len];
-    unsigned char PDU[PDU_len];
-    
+    static int TI=0;
+    uint8_t MBAP[MBAP_len];
+
+    // Assemble the MBAP
+
+    TI++;
+    // Transaction ID
+    MBAP[0] = (uint8_t)((TI & 0xFF00) >> 8);
+    MBAP[1] = (uint8_t)(TI & 0xFF);
+    // Protocol ID
+    MBAP[2] = 0;
+    MBAP[3] = 0;
+    // length
+    MBAP[4] = (uint8_t)((APDUlen+1) >> 8);
+    MBAP[5] = (uint8_t)((APDUlen+1) & 0xFF);
+    // unit ID
+    MBAP[6] = 1;
+
+    printf("MBAP:\nTI:%.2x %.2x\tPI:%.2x %.2x\tlength:%.2x %.2x\tUI:%.2x\n", MBAP[0], MBAP[1], MBAP[2], MBAP[3], MBAP[4], MBAP[5], MBAP[6]);
+
+    // Configure server
+    serv.sin_family = AF_INET;
+    serv.sin_port = htons(port);
+    serv.sin_addr.s_addr = inet_addr(server_add);
+
+    // Create socket
     printf("[TCP] Creating socket...\n");
     sock = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -28,46 +48,30 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
     }
     printf("[TCP] Socket created\n");
 
-    serv.sin_family = AF_INET;
-    serv.sin_port = htons(port);
-    inet_aton(server_add, &serv.sin_addr);
-
+    // Connect to server
     printf("[TCP] Connecting to %s:%d...\n", server_add, port);
-    if(connect(sock, (struct sockaddr *)&serv, addlen) < 0){
+    if(connect(sock, (struct sockaddr *)&serv, sizeof(serv)) < 0){
         perror("connect");
         return -1;
     }
 
     printf("[TCP] Connected to %s:%d\n", server_add, port);
 
-    // TI
-    MBAPDU[0] = (uint8_t) (TI>>8);
-    MBAPDU[1] = (uint8_t) (TI & 0xff);
-    // PI
-    MBAPDU[2] = 0x00;
-    MBAPDU[3] = 0x00;
-    // length
-    MBAPDU[4] = (uint8_t) ((APDUlen+1)>>8);
-    MBAPDU[5] = (uint8_t) ((APDUlen+1) & 0xff);
-    // unit ID
-    MBAPDU[6] = 0x01;
 
-    for(int i=0; i<MBAPDU_len; i++){
-        PDU[i] = MBAPDU[i];
-    }
-    for(int i=MBAPDU_len; i<PDU_len; i++){
-        PDU[i] = APDU[i-MBAPDU_len];
-    }
-
+    // Send MBAP
     printf("[TCP] Sending data...\n");
 
-    if(len = send(sock, PDU, PDU_len, 0) < 0){
+    len = send(sock, MBAP, MBAP_len, 0);
+
+    if(len < 0){
         perror("[TCP] send write");
         return -1;
     }
 
-    if(len != PDU_len){
-        printf("%d\t%d\n", len, PDU_len);
+    // Send APDU
+    len = send(sock, APDU, APDUlen, 0);
+
+    if(len != APDUlen){
         perror("[TCP] len");
         return -1;
     }
@@ -76,29 +80,23 @@ int Send_Modbus_request(char *server_add, int port, uint8_t *APDU, int APDUlen, 
 
     printf("[TCP] Receiving data...\n");
 
-    if(MBAPDU_R_len = recv(sock, MBAPDU_R, MBAPDU_len, 0) < 0){
+    // Receive MBAP
+    len = recv(sock, MBAP, MBAP_len, 0);
+
+    if(len < 0){
         perror("recv");
         return -1;
     }
 
-    printf("[TCP] MBAPDU received\n");
+    printf("[TCP] MBAP received\n");
 
-    if(MBAPDU_R_len != MBAPDU_len){
-        printf("[TCP] Wrong MBAPDU length\n");
-        return -1;
-    }
-    if(MBAPDU_R[0] != 0x15 || MBAPDU_R[1] != 0x01){
-        printf("[TCP] Wrong TI\n");
-        return -1;
-    }
-    if(MBAPDU_R[2] != 0x00 || MBAPDU_R[3] != 0x00){
-        printf("[TCP] Wrong PI\n");
-        return -1;
-    }
+    // Get length of APDU
+    len = (MBAP[4] << 8) + MBAP[5];
+    
+    // Receive APDU
+    int len_response = recv(sock, APDU_R, len-1, 0);
 
-    APDU_R_len = MBAPDU_R[4] * 256 + MBAPDU_R[5];
-
-    if(len = recv(sock, APDU_R, APDU_R_len, 0) < 0){
+    if(len_response < 0){
         perror("TCP read");
         return -1;
     }

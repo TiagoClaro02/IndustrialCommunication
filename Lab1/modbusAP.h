@@ -1,12 +1,8 @@
 #include <stdio.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-#include "modbusTCP.h"
+#include <stdint.h>
 
-int Write_multiple_regs(char *server_add, int port, int st_r, int n_r, uint8_t *regs);
+int Write_multiple_regs(char *server_add, int port, uint16_t st_r, uint16_t n_r, uint16_t *val);
 /*
     server_add: server address
     port: server port
@@ -17,7 +13,7 @@ int Write_multiple_regs(char *server_add, int port, int st_r, int n_r, uint8_t *
     return: number of registers written or -1 if error
 */
 
-int Read_h_regs(char *server_add, int port, int st_r, int n_r, uint8_t *regs);
+int Read_h_regs(char *server_add, int port, uint16_t st_r, uint16_t n_r, uint16_t *val);
 /*
     server_add: server address
     port: server port
